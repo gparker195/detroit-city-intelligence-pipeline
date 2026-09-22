@@ -5,7 +5,7 @@
     "dci:generator": "tools/basemap/style.mjs",
     "dci:basemaps": "@protomaps/basemaps 5.7.2 (BSD-3-Clause), Protomaps basemap style CC0",
     "dci:data": "OpenStreetMap contributors, ODbL; rendered Produced Work only, never merged into evidence",
-    "dci:tokens": "packages/design-tokens/build/ts/tokens.ts",
+    "dci:tokens": "design-token values inlined in tools/basemap/style.mjs (source: private monorepo packages/design-tokens)",
     "dci:sprite-note": "MapLibre requires an absolute sprite URL; the loader must set style.sprite = new URL(style.sprite, location.origin).href (glyphs may stay relative)."
   },
   "glyphs": "/basemap/fonts/{fontstack}/{range}.pbf",
