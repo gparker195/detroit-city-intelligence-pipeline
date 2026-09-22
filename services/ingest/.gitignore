@@ -1,0 +1,4 @@
+# Snapshots, changes, health, and manifest are generated locally; keep only the layout note.
+data/*
+!data/README.md
+node_modules/

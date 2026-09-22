@@ -1,0 +1,23 @@
+# Generated data: snapshots, changes, health, manifests, archives. Produced by the workflow,
+# published as release assets; only each data/README.md (the layout note) is tracked.
+**/data/*
+!**/data/README.md
+dist/
+
+# Toolchains
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Basemap build outputs (the extract is a release asset; fonts/sprites are downloaded)
+*.pmtiles
+bin/
+tools/basemap/public/
+tools/basemap/smoke.png
+
+# Local
+.DS_Store
+*.log
+.env
+.env.*

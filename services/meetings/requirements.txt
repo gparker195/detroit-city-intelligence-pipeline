@@ -1,0 +1,2 @@
+# MIT-licensed. Everything else is the Python standard library.
+pdfplumber>=0.11,<0.12

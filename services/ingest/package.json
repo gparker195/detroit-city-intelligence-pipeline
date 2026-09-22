@@ -1,0 +1,25 @@
+{
+  "name": "@dci/ingest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Detroit City Intelligence freshness proof: ArcGIS FeatureServer ingest, immutable snapshots, diff engine, per-source health, manifest.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "fetch": "node src/cli/main.ts fetch",
+    "fetch:study-area": "node src/cli/main.ts fetch-study-area",
+    "diff": "node src/cli/main.ts diff",
+    "health": "node src/cli/main.ts health",
+    "manifest": "node src/cli/main.ts manifest",
+    "test": "node --test 'test/**/*.test.ts'",
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}

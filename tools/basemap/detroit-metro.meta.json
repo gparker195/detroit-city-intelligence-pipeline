@@ -1,0 +1,26 @@
+{
+  "name": "detroit-metro.pmtiles",
+  "buildDate": "2026-09-21",
+  "sourceUrl": "https://build.protomaps.com/20260921.pmtiles",
+  "sourceListing": "https://build-metadata.protomaps.dev/builds.json",
+  "sourceUploaded": "2026-09-21T09:08:31.176Z",
+  "sourceSizeBytes": 138203225035,
+  "sourceTilesetVersion": "4.15.2",
+  "bbox": [
+    -83.6,
+    42.1,
+    -82.8,
+    42.6
+  ],
+  "maxzoom": 15,
+  "sizeBytes": 76817706,
+  "sha256": "41fe97c82a6f227901329412bc4a243fbf21e424d7f0d0ce85f657b80ff2a021",
+  "extractSeconds": 6.6,
+  "pmtilesCli": "pmtiles 1.31.2, commit a3e4951ea6a0477b784c27c1dcbfd9c130878c5a, built at 2026-07-22T18:59:03Z",
+  "pmtilesCliUrl": "https://github.com/protomaps/go-pmtiles/releases/download/v1.31.2/go-pmtiles-1.31.2_Darwin_arm64.zip",
+  "pmtilesCliZipSha256": "40528f7f616fcbf91207cd48c8fc023d213f6d86c0cbf1f748732803d1880f3d",
+  "builtAt": "2026-09-22T04:08:03.520Z",
+  "license": "Data © OpenStreetMap contributors (ODbL). Protomaps basemap style CC0. Rendered Produced Work only; never merged into the evidence database.",
+  "attribution": "© OpenStreetMap contributors",
+  "notes": []
+}

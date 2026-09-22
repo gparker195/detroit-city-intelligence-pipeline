@@ -1,0 +1,22 @@
+{
+  "name": "@dci/tools-basemap",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Keyless self-hosted Protomaps/OpenStreetMap vector basemap extract for the Detroit metro (rendered Produced Work only; never merged into the evidence database)",
+  "type": "module",
+  "scripts": {
+    "extract": "./build.sh",
+    "assets": "node fetch-assets.mjs",
+    "style": "node style.mjs",
+    "test": "node --test \"test/*.test.mjs\"",
+    "smoke": "node test/smoke.test.mjs"
+  },
+  "dependencies": {
+    "@protomaps/basemaps": "^5.7.2",
+    "pmtiles": "^4.5.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0",
+    "maplibre-gl": "^6.10.0"
+  }
+}

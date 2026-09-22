@@ -1,0 +1,30 @@
+{
+  "name": "@dci/civic",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Detroit City Intelligence civic connectors: USAspending, Bonfire, Program Registry, State Tax Commission certificates, Elections knowledge pack.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "usaspending": "node src/usaspending/cli.ts",
+    "bonfire": "node src/bonfire/cli.ts",
+    "programs": "node src/programs/cli.ts",
+    "stc": "node src/stc/cli.ts",
+    "elections": "node src/elections/cli.ts",
+    "manifest": "node src/util/manifestCli.ts",
+    "test": "node --test 'test/**/*.test.ts'",
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^5.4.0",
+    "playwright": "^1.55.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}

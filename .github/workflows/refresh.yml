@@ -1,0 +1,202 @@
+# Daily refresh for the Detroit City Intelligence public pipeline (PRD "Freshness",
+# scheduler preference 1: GitHub Actions cron on the free public-repo quota).
+# No secrets, no keys: every source is public. GITHUB_TOKEN is used only to publish
+# the rolling "latest" release and to read the previous one back as the diff baseline.
+#
+# 06:00 America/Detroit = 10:00 UTC (EDT) / 11:00 UTC (EST). Cron has no time zone, so both
+# UTC hours are scheduled and the job exits early when it is not 06:00 local.
+
+name: refresh
+
+on:
+  schedule:
+    - cron: "0 10 * * *"
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Re-fetch every layer even if lastEditDate is unchanged"
+        type: boolean
+        default: false
+      basemap:
+        description: "Rebuild the basemap extract from the latest Protomaps planet build (otherwise only on Sundays or when no release asset exists)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+env:
+  DCI_STUDY_AREA: livernois-mcnichols
+  DCI_BASEMAP_DIR: ${{ github.workspace }}/tools/basemap/public/basemap
+  TZ: America/Detroit
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Gate on 06:00 local time
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(date +%H)" = "06" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not 06:00 America/Detroit; skipping this cron slot."; echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+
+      - uses: pnpm/action-setup@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.run == 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          pnpm install --frozen-lockfile
+          python3 -m venv services/meetings/.venv
+          services/meetings/.venv/bin/pip install --quiet -r services/meetings/requirements.txt
+
+      # 0. Baseline: the previous run's published state (latest snapshot per source, change history,
+      #    meetings/civic outputs) so the diff engine can say what changed. First run: nothing to restore.
+      - name: Restore previous release as the diff baseline
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          mkdir -p dist/previous
+          if gh release download latest --repo "$GITHUB_REPOSITORY" --pattern dci-public.tar.gz --dir dist/previous 2>/dev/null; then
+            bash scripts/restore.sh dist/previous/dci-public.tar.gz
+          else
+            echo "::notice::no previous 'latest' release; this run has no diff baseline"
+          fi
+
+      # 1. City ArcGIS feeds for the study area (skips layers whose lastEditDate is unchanged).
+      - name: Ingest fetch:study-area
+        if: steps.gate.outputs.run == 'true'
+        working-directory: services/ingest
+        run: pnpm run fetch:study-area "$DCI_STUDY_AREA" ${{ inputs.force && '--force' || '' }}
+
+      # 2. Council meetings: current record plus the Tuesday/Monday agenda window.
+      - name: Meetings fetch
+        if: steps.gate.outputs.run == 'true'
+        working-directory: services/meetings
+        run: .venv/bin/python -m meetings fetch --back 60 --ahead 30 || echo "::warning::meetings fetch reported a problem (challenge or terms); see data/runs"
+
+      # 3. Civic connectors on their cadences (usaspending weekly, stc monthly; the rest daily).
+      - name: Civic connectors
+        if: steps.gate.outputs.run == 'true'
+        working-directory: services/civic
+        run: |
+          DOW=$(date +%u); DOM=$(date +%d)
+          pnpm run programs || echo "::warning::programs connector failed"
+          pnpm run elections || echo "::warning::elections connector failed"
+          pnpm run bonfire || echo "::notice::bonfire is a link-out while robots.txt disallows"
+          if [ "$DOW" = "1" ]; then pnpm run usaspending || echo "::warning::usaspending connector failed"; fi
+          if [ "$DOM" = "01" ]; then pnpm exec playwright install --with-deps chromium && (pnpm run stc || echo "::warning::stc connector failed"); fi
+          pnpm run manifest > /dev/null
+
+      # 4. Basemap glyphs and sprites (SIL OFL / MIT), cached; style from the committed generator.
+      - name: Cache basemap assets
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            tools/basemap/public/basemap/fonts
+            tools/basemap/public/basemap/sprites
+          key: basemap-assets-v1-${{ github.run_id }}
+          restore-keys: basemap-assets-v1-
+
+      - name: Basemap assets and style
+        if: steps.gate.outputs.run == 'true'
+        working-directory: tools/basemap
+        run: |
+          if [ ! -d public/basemap/fonts ] || [ ! -d public/basemap/sprites ]; then node fetch-assets.mjs; fi
+          node style.mjs
+
+      # 4b. Basemap extract: on Sundays (or on request, or when no release asset exists yet) extract the
+      #     Detroit metro from the Protomaps daily planet build (pmtiles CLI, HTTP range requests, no key).
+      #     Other days reuse the extract published in the previous release.
+      - name: Basemap extract
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          mkdir -p "$DCI_BASEMAP_DIR"
+          if [ "$(date +%u)" != "7" ] && [ "${{ inputs.basemap }}" != "true" ] \
+             && gh release download latest --repo "$GITHUB_REPOSITORY" --pattern 'detroit-metro.pmtiles' --pattern 'detroit-metro.meta.json' --dir "$DCI_BASEMAP_DIR" 2>/dev/null; then
+            cp "$DCI_BASEMAP_DIR/detroit-metro.meta.json" tools/basemap/detroit-metro.meta.json
+            echo "reusing the basemap extract from the previous release ($(python3 -c "import json;print(json.load(open('tools/basemap/detroit-metro.meta.json'))['buildDate'])"))"
+          else
+            bash tools/basemap/build.sh
+          fi
+
+      # 5. Assemble the static artifact folder (manifest, health, snapshots, changes, civic, basemap)
+      #    behind the Documenters and person-field guards, then pack the tarball the next run restores.
+      - name: Publish artifact folder
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          bash scripts/publish.sh dist/public
+          tar -czf dist/dci-public.tar.gz -C dist/public --exclude='./basemap/detroit-metro.pmtiles' --exclude='./basemap/fonts' --exclude='./basemap/sprites' .
+          ls -la dist dist/public dist/public/basemap
+
+      # 6. Record basemap provenance in git (the only thing committed by the bot: a small meta file).
+      - name: Commit basemap provenance
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          git config user.name "dci-refresh[bot]"
+          git config user.email "dci-refresh@users.noreply.github.com"
+          git add tools/basemap/detroit-metro.meta.json tools/basemap/style.detroit-dark.json
+          git commit -m "refresh: basemap provenance $(date -u +%Y-%m-%dT%H:%MZ)" || echo "basemap provenance unchanged"
+          git push
+          git tag -f latest
+          git push -f origin latest
+
+      - name: Upload artifact
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dci-public-${{ github.run_id }}
+          path: |
+            dist/public
+            !dist/public/basemap/fonts
+          retention-days: 30
+
+      - name: Release (rolling "latest")
+        if: steps.gate.outputs.run == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest refresh
+          body: |
+            Detroit City Intelligence public data artifacts, refreshed daily at 06:00 America/Detroit.
+            Every record carries a City-updated date and a fetched date; see manifest.json and health.json.
+            dci-public.tar.gz holds snapshots/, changes/, civic/, basemap style and attribution (not the
+            .pmtiles, fonts or sprites). Provided AS-IS by the City of Detroit Open Data Portal; no warranty
+            as to accuracy, timeliness, or completeness. Basemap: (c) OpenStreetMap contributors, ODbL,
+            rendered basemap only.
+          files: |
+            dist/dci-public.tar.gz
+            dist/public/manifest.json
+            dist/public/health.json
+            dist/public/index.json
+            dist/public/basemap/detroit-metro.pmtiles
+            dist/public/basemap/detroit-metro.meta.json
+            dist/public/basemap/style.detroit-dark.json
+            dist/public/basemap/ATTRIBUTION.txt
+          fail_on_unmatched_files: false
